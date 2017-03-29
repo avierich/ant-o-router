@@ -9,8 +9,13 @@ RECT_HEIGHT = SCREEN_HEIGHT / GRID_HEIGHT
 
 COLORS = np.random.randint(155, size = (1000, 3)) + 100
 
+NORTH = 0
+EAST = 1
+SOUTH = 2
+WEST = 3
 
 class Ant :
+
 
     def __init__(self, world, position, species, destination) :
         self.world = world
@@ -18,10 +23,41 @@ class Ant :
         self.species = species
         self.dead = False
         self.color = (COLORS[species][0],COLORS[species][1],COLORS[species][2])
-        self.genes = np.random.randint(4294967295)
-        self.random = np.random.RandomState(self.genes)
         self.destination = destination
         self.success = False
+        self.genes = self.findPath(position, destination)
+        self.age = 0
+
+    def mutate(self, genes) :
+        randA = np.random.randint(len(genes) + 1)
+        randB = np.random.randint(len(genes) + 2)
+        if np.random.rand() > 0.5 :
+            genes.insert(randA, EAST)
+            genes.insert(randB, WEST)
+        else :
+            genes.insert(randA, NORTH)
+            genes.insert(randB, SOUTH)
+
+        self.genes = genes
+
+    def findPath(self, position, destination) :
+        xDist = destination.position[0] - position[0]
+        yDist = position[1] - destination.position[1]
+
+        path = []
+
+        for i in range(abs(xDist)) :
+            if abs(xDist) - xDist == 0 : # xDist is positive
+                path.append(EAST)
+            else :
+                path.append(WEST)
+        for i in range(abs(yDist)) :
+            if abs(yDist) - yDist == 0 : # yDist is positive
+                path.append(NORTH)
+            else :
+                path.append(SOUTH)
+
+        return path
 
     def kill(self) :
         for row in self.world :
@@ -32,6 +68,11 @@ class Ant :
 
     def moveTo(self, coord) :
         self.position = coord
+            
+        # If the coord is going to be out of bounds
+        if coord[0] >= GRID_WIDTH or coord[0] < 0 or coord[1] >= GRID_HEIGHT or  coord[1] < 0 :
+            self.kill()
+            return
 
         if len(self.world[coord[0]][coord[1]]) == 0 :
             self.world[self.position[0]][self.position[1]].append(self)
@@ -45,22 +86,19 @@ class Ant :
                 self.world[coord[0]][coord[1]][0].kill()
                 self.kill()
 
-    def march(self) :
-        direction = np.array(self.destination.position) - np.array(self.position)
-        direction = direction/np.sqrt(np.sum(direction**2))
+        self.age += 1
 
-        if self.random.rand() < 0.5 :
-            # move in the x direction
-            if self.random.rand() < 0.5 and self.position[0] > 0 : # move to the left
-                self.moveTo((self.position[0] - 1, self.position[1]))
-            elif self.position[0] < GRID_WIDTH - 1 :
-                self.moveTo((self.position[0] + 1,  self.position[1]))
-        else :
-            # move in the y direction
-            if self.random.rand() < 0.5 and self.position[1] > 0 :
+    def march(self) :
+            nextMove = self.genes[self.age]
+
+            if nextMove == NORTH :
                 self.moveTo((self.position[0], self.position[1] - 1))
-            elif self.position[1] < GRID_HEIGHT - 1 :
+            elif nextMove == EAST :
+                self.moveTo((self.position[0] + 1, self.position[1]))
+            elif nextMove == SOUTH :
                 self.moveTo((self.position[0], self.position[1] + 1))
+            elif nextMove == WEST :
+                self.moveTo((self.position[0] - 1, self.position[1]))
 
 
 class Nest :
@@ -80,20 +118,20 @@ class Nest :
 
     def addConnection(self, connectedNest) :
         self.connections.append(connectedNest)
-        for i in range(1): 
-            self.newAnt()
+        #for i in range(1): 
+         #   self.newAnt()
 
     def marchAnts(self) :
         for ant in self.ants :
             if ant.dead :
                 self.ants.remove(ant)
                 self.newAnt()
+                self.ants[-1].mutate(ant.genes)
             elif not ant.success and ant.position == ant.destination.position :
-                print('successful ant!! '+str(ant.species) +'  ' + str(ant.genes))
                 ant.success = True
-                for i in range(5) :
-                    if len(self.ants) <= self.numAnts :
-                        self.newAnt(ant = ant)
+#                for i in range(5) :
+#                    if len(self.ants) <= self.numAnts :
+#                        self.newAnt(ant = ant)
             elif not ant.success :
                 ant.march()
 
@@ -112,15 +150,18 @@ for i in range(GRID_WIDTH) :
 #world[80][35].append(1)
 
 nests = []
-nests.append(Nest(world, (20, 20), 0))
-nests.append(Nest(world, (80, 20), 0))
-nests.append(Nest(world, (20, 50), 1))
-nests.append(Nest(world, (80, 50), 1))
+nests.append(Nest(world, (20, 35), 0))
+nests.append(Nest(world, (80, 35), 0))
+nests.append(Nest(world, (40, 10), 1))
+nests.append(Nest(world, (60, 60), 1))
 
 nests[0].addConnection(nests[1])
 nests[1].addConnection(nests[0])
 nests[2].addConnection(nests[3])
 nests[3].addConnection(nests[2])
+
+nests[0].newAnt()
+nests[2].newAnt()
 
 
 pygame.init()
@@ -137,7 +178,7 @@ while running:
 
     # Redraw
     if frame % skip_frames == 0 : # skip drawing frames
-        pygame.time.wait(1)
+        pygame.time.wait(100)
         pygame.display.set_caption(str(frame))
         screen.fill((0,0,0))
         for x in range(len(world)) :
