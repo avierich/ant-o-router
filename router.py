@@ -27,6 +27,7 @@ class Ant :
         self.success = False
         self.age = 0
         self.coords = []
+        self.direction = NORTH
 
 
     def kill(self) :
@@ -35,35 +36,71 @@ class Ant :
 
         self.dead = True
 
-    def moveTo(self, direction) :
-            coord = 0
-            if direction == NORTH :
-                coord = (self.position[0], self.position[1] - 1)
-            elif direction == EAST :
-                coord = (self.position[0] + 1, self.position[1])
-            elif direction == SOUTH :
-                coord = (self.position[0], self.position[1] + 1)
-            elif direction == WEST :
-                coord = (self.position[0] - 1, self.position)
+    def move(self, direction) :
+        if direction == NORTH :
+            self.position = (self.position[0], self.position[1] - 1)
+        elif direction == EAST :
+            self.position = (self.position[0] + 1, self.position[1])
+        elif direction == SOUTH :
+            self.position = (self.position[0], self.position[1] + 1)
+        elif direction == WEST :
+            self.position = (self.position[0] - 1, self.position[1])
 
-            self.world[coord[0]][coord[1]].append(self)
-            self.position = coord
-            self.coords.append(coord)
+        self.direction = direction
+        self.world[self.position[0]][self.position[1]].append(self)
+
+    def otherAnt(self, coord) :
+        return len(self.world[coord[0]][coord[1]]) > 0 and self.world[coord[0]][coord[1]][0].species != self.species
+
+    def canMove(self, direction) :
+        if direction == NORTH : 
+            return self.direction != SOUTH and self.position[1] > 1 and not self.otherAnt((self.position[0], self.position[1] - 2)) and not self.otherAnt((self.position[0] - 1, self.position[1] - 2)) and not self.otherAnt((self.position[0] + 1, self.position[1] - 2))
+        elif direction == EAST :
+            return self.direction != WEST and self.position[0] < GRID_WIDTH - 2 and not self.otherAnt((self.position[0] + 2, self.position[1])) and not self.otherAnt((self.position[0] + 2, self.position[1] + 1)) and not self.otherAnt((self.position[0] + 2, self.position[1] - 1))
+        elif direction == SOUTH :
+            return self.direction != NORTH and self.position[1] < GRID_HEIGHT - 2 and not self.otherAnt((self.position[0], self.position[1] + 2)) and not self.otherAnt((self.position[0] + 1, self.position[1] + 2)) and not self.otherAnt((self.position[0] - 1, self.position[1] + 2))
+        elif direction == WEST :
+            return self.direction != EAST and self.position[0] > 1 and not self.otherAnt((self.position[0] - 2, self.position[1])) and not self.otherAnt((self.position[0] - 2, self.position[1] + 1)) and not self.otherAnt((self.position[0] - 2, self.position[1] - 1))
+        else :
+            return False
 
     def march(self) :
         direction = np.array([self.destination.position[0] - self.position[0], self.destination.position[1] - self.position[1]])
         direction = direction / np.sqrt(np.sum(direction**2))
-        # Move horizontal
-        if np.random.rand() < np.abs(direction[0]) :
+
+        # Which way do I want to go most?
+        primaryDirection = -1
+        secondaryDirection = -1
+        if np.abs(direction[0]) > np.abs(direction[1]) :
             if direction[0] > 0 :
-                self.moveTo(EAST)
+                primaryDirection = EAST
             else :
-                self.moveTo(WEST)
+                primaryDirection = WEST
+
+            if direction[1] > 0 :
+                secondaryDirection = SOUTH
+            else :
+                secondaryDirection = NORTH
         else :
-            if direction[1] < 0 :
-                self.moveTo(NORTH)
+            if direction[1] > 0 :
+                primaryDirection = SOUTH
             else :
-                self.moveTo(SOUTH)
+                primaryDirection = NORTH
+
+            if direction[0] > 0 :
+                secondaryDirection = EAST
+            else :
+                secondaryDirection = WEST
+
+        teriaryDirection = self.direction
+        # Lets go for it
+        if self.canMove(primaryDirection) :
+            self.move(primaryDirection)
+        elif self.canMove(secondaryDirection) :
+            self.move(secondaryDirection)
+        elif self.canMove(teriaryDirection) :
+            self.move(teriaryDirection)
+            
 
 class Nest :
     def __init__(self, world, position, species) :
