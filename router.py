@@ -2,8 +2,8 @@ import numpy as np
 import pygame
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
-GRID_WIDTH = 8
-GRID_HEIGHT = 8
+GRID_WIDTH = 40
+GRID_HEIGHT = 40
 RECT_WIDTH = SCREEN_WIDTH / GRID_WIDTH
 RECT_HEIGHT = SCREEN_HEIGHT / GRID_HEIGHT
 
@@ -25,109 +25,45 @@ class Ant :
         self.color = (COLORS[species][0],COLORS[species][1],COLORS[species][2])
         self.destination = destination
         self.success = False
-        self.genes = self.findPath(position, destination)
         self.age = 0
-        self.minLength = len(self.genes)
+        self.coords = []
 
-    def mutate(self, genes) :
-        randA = np.random.randint(len(genes) + 1)
-        randB = np.random.randint(len(genes) + 2)
-        if np.random.rand() > 0.5 :
-            if np.random.rand() > 0.5 :
-                genes.insert(randA, EAST)
-                genes.insert(randB, WEST)
-            else :
-                genes.insert(randA, NORTH)
-                genes.insert(randB, SOUTH)
-        elif len(self.genes) > self.minLength :
-            if NORTH in self.genes and SOUTH in self.genes :
-                self.genes.remove(NORTH)
-                self.genes.remove(SOUTH)
-            elif EAST in self.genes and WEST in self.genes :
-                self.genes.remove(EAST)
-                self.genes.remove(WEST)
-
-        self.genes = genes
-
-    def findPath(self, position, destination) :
-        xDist = destination.position[0] - position[0]
-        yDist = position[1] - destination.position[1]
-
-        path = []
-
-        for i in range(abs(xDist)) :
-            if abs(xDist) - xDist == 0 : # xDist is positive
-                path.append(EAST)
-            else :
-                path.append(WEST)
-        for i in range(abs(yDist)) :
-            if abs(yDist) - yDist == 0 : # yDist is positive
-                path.append(NORTH)
-            else :
-                path.append(SOUTH)
-
-        return path
 
     def kill(self) :
-#        for row in self.world :
-#            for tile in row :
-#                if self in tile :
-#                    tile.remove(self)
+        for pos in self.coords :
+            self.world[pos[0]][pos[1]].remove(self)
 
-        position =  self.position
-        #self.world[position[0]][position[1]].remove(self)
-        for i in range(self.age-1, -1, -1) :
-            self.world[position[0]][position[1]].remove(self)
-            if self.genes[i] == NORTH :
-                position = (position[0], position[1] + 1)
-            elif self.genes[i] == EAST :
-                position = (position[0] - 1, position[1])
-            elif self.genes[i] == SOUTH :
-                position = (position[0], position[1] - 1)
-            elif self.genes[i] == WEST :
-                position = (position[0] + 1, position[1])
-            #if self in self.world[position[0]][position[1]] :
-
-            
         self.dead = True
 
-    def moveTo(self, coord) :
-            
-        # If the coord is going to be out of bounds
-        if coord[0] >= GRID_WIDTH or coord[0] < 0 or coord[1] >= GRID_HEIGHT or  coord[1] < 0 :
-            self.kill()
-            return
+    def moveTo(self, direction) :
+            coord = 0
+            if direction == NORTH :
+                coord = (self.position[0], self.position[1] - 1)
+            elif direction == EAST :
+                coord = (self.position[0] + 1, self.position[1])
+            elif direction == SOUTH :
+                coord = (self.position[0], self.position[1] + 1)
+            elif direction == WEST :
+                coord = (self.position[0] - 1, self.position)
 
-        if len(self.world[coord[0]][coord[1]]) == 0 : # this is a valid place to move
+            self.world[coord[0]][coord[1]].append(self)
             self.position = coord
-            self.world[self.position[0]][self.position[1]].append(self)
-        else :
-            otherAnt = False
-            for ant in world[coord[0]][coord[1]] :
-                if ant.species != self.species :
-                    otherAnt = True
-
-            if otherAnt :
-                self.world[coord[0]][coord[1]][0].kill()
-                self.kill()
-            else :
-                self.position = coord
-                self.world[self.position[0]][self.position[1]].append(self)
-
-        self.age += 1
+            self.coords.append(coord)
 
     def march(self) :
-            nextMove = self.genes[self.age]
-
-            if nextMove == NORTH :
-                self.moveTo((self.position[0], self.position[1] - 1))
-            elif nextMove == EAST :
-                self.moveTo((self.position[0] + 1, self.position[1]))
-            elif nextMove == SOUTH :
-                self.moveTo((self.position[0], self.position[1] + 1))
-            elif nextMove == WEST :
-                self.moveTo((self.position[0] - 1, self.position[1]))
-
+        direction = np.array([self.destination.position[0] - self.position[0], self.destination.position[1] - self.position[1]])
+        direction = direction / np.sqrt(np.sum(direction**2))
+        # Move horizontal
+        if np.random.rand() < np.abs(direction[0]) :
+            if direction[0] > 0 :
+                self.moveTo(EAST)
+            else :
+                self.moveTo(WEST)
+        else :
+            if direction[1] < 0 :
+                self.moveTo(NORTH)
+            else :
+                self.moveTo(SOUTH)
 
 class Nest :
     def __init__(self, world, position, species) :
@@ -178,7 +114,7 @@ for i in range(GRID_WIDTH) :
 #world[80][35].append(1)
 
 nests = []
-nests.append(Nest(world, (int(GRID_WIDTH / 4)-1,int(GRID_HEIGHT/2)), 0))
+nests.append(Nest(world, (int(GRID_WIDTH / 4),int(GRID_HEIGHT/2)), 0))
 nests.append(Nest(world, (int(GRID_WIDTH *3/4), int(GRID_HEIGHT /2)), 0))
 nests.append(Nest(world, (int(GRID_WIDTH /2), int(GRID_HEIGHT/4)), 1))
 nests.append(Nest(world, (int(GRID_WIDTH/2), int(GRID_HEIGHT *3/4)), 1))
@@ -194,7 +130,7 @@ nests[2].newAnt()
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-skip_frames = 10000
+skip_frames = 1
 frame = 0
 
 running = True
@@ -206,7 +142,7 @@ while running:
 
     # Redraw
     if frame % skip_frames == 0 : # skip drawing frames
-        pygame.time.wait(0)
+        pygame.time.wait(200)
         pygame.display.set_caption(str(frame))
         screen.fill((0,0,0))
         for x in range(len(world)) :
